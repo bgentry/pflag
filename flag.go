@@ -439,9 +439,14 @@ func (f *FlagSet) parseArgs(args []string) error {
 			}
 			if len(split) == 1 {
 				if _, ok := flag.Value.(*boolValue); !ok {
-					return f.failf("flag needs an argument: %s", s)
+					if len(args) == 0 || len(args[0]) == 0 || args[0][0] == '-' {
+						return f.failf("flag needs an argument: %s", s)
+					}
+					f.setFlag(flag, args[0], s)
+					args = args[1:]
+				} else {
+					f.setFlag(flag, "true", s)
 				}
-				f.setFlag(flag, "true", s)
 			} else {
 				if err := f.setFlag(flag, split[1], s); err != nil {
 					return err
