@@ -340,6 +340,22 @@ func TestHelp(t *testing.T) {
 	}
 }
 
+func TestChanged(t *testing.T) {
+	f := NewFlagSet("test", ContinueOnError)
+	f.String("key1", "", "")
+	f.String("key2", "", "")
+	err := f.Parse([]string{"--key1", "value1"})
+	if err != nil {
+		t.Fatal("expected no error; got ", err)
+	}
+	if !f.Lookup("key1").Changed {
+		t.Fatal("expected key1 to be marked as Changed")
+	}
+	if f.Lookup("key2").Changed {
+		t.Fatal("expected key2 to not be marked as Changed")
+	}
+}
+
 func TestNoInterspersed(t *testing.T) {
 	f := NewFlagSet("test", ContinueOnError)
 	f.SetInterspersed(false)
