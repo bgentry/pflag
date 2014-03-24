@@ -126,16 +126,17 @@ type FlagSet struct {
 	// a custom error handler.
 	Usage func()
 
-	name          string
-	parsed        bool
-	actual        map[string]*Flag
-	formal        map[string]*Flag
-	shorthands    map[byte]*Flag
-	args          []string // arguments after flags
-	exitOnError   bool     // does the program exit if there's an error?
-	errorHandling ErrorHandling
-	output        io.Writer // nil means stderr; use out() accessor
-	interspersed  bool      // allow interspersed option/non-option args
+	name              string
+	parsed            bool
+	actual            map[string]*Flag
+	formal            map[string]*Flag
+	shorthands        map[byte]*Flag
+	args              []string // arguments after flags
+	exitOnError       bool     // does the program exit if there's an error?
+	errorHandling     ErrorHandling
+	output            io.Writer // nil means stderr; use out() accessor
+	disableDuplicates bool      // disallow flags from being used more than once
+	interspersed      bool      // allow interspersed option/non-option args
 }
 
 // A Flag represents the state of a flag.
@@ -221,6 +222,9 @@ func (f *FlagSet) Set(name, value string) error {
 	flag, ok := f.formal[name]
 	if !ok {
 		return fmt.Errorf("no such flag -%v", name)
+	}
+	if f.disableDuplicates && flag.Changed {
+		return fmt.Errorf("duplicate flag: %s", flag.Name)
 	}
 	err := flag.Value.Set(value)
 	if err != nil {
@@ -396,6 +400,9 @@ func (f *FlagSet) setFlag(flag *Flag, value string, origArg string) error {
 	if err := flag.Value.Set(value); err != nil {
 		return f.failf("invalid argument %q for %s: %v", value, origArg, err)
 	}
+	if f.disableDuplicates && flag.Changed {
+		return fmt.Errorf("duplicate flag: %s", strings.Split(origArg, "=")[0])
+	}
 	// mark as visited for Visit()
 	if f.actual == nil {
 		f.actual = make(map[string]*Flag)
@@ -445,10 +452,14 @@ func (f *FlagSet) parseArgs(args []string) error {
 					if len(args) == 0 || len(args[0]) == 0 || args[0][0] == '-' {
 						return f.failf("flag needs an argument: %s", s)
 					}
-					f.setFlag(flag, args[0], s)
+					if err := f.setFlag(flag, args[0], s); err != nil {
+						return err
+					}
 					args = args[1:]
 				} else {
-					f.setFlag(flag, "true", s)
+					if err := f.setFlag(flag, "true", s); err != nil {
+						return err
+					}
 				}
 			} else {
 				if err := f.setFlag(flag, split[1], s); err != nil {
@@ -524,6 +535,11 @@ func Parse() {
 	commandLine.Parse(os.Args[1:])
 }
 
+// Whether to error when a flag is duplicated (used more than once).
+func SetDisableDuplicates(disableDuplicates bool) {
+	commandLine.SetDisableDuplicates(disableDuplicates)
+}
+
 // Whether to support interspersed option/non-option arguments.
 func SetInterspersed(interspersed bool) {
 	commandLine.SetInterspersed(interspersed)
@@ -546,6 +562,11 @@ func NewFlagSet(name string, errorHandling ErrorHandling) *FlagSet {
 		interspersed:  true,
 	}
 	return f
+}
+
+// Whether to error when a flag is duplicated (used more than once).
+func (f *FlagSet) SetDisableDuplicates(disableDuplicates bool) {
+	f.disableDuplicates = disableDuplicates
 }
 
 // Whether to support interspersed option/non-option arguments.

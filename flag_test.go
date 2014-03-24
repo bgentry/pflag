@@ -356,6 +356,29 @@ func TestChanged(t *testing.T) {
 	}
 }
 
+func TestDuplicates(t *testing.T) {
+	f := NewFlagSet("test", ContinueOnError)
+	f.String("key", "", "")
+	err := f.Parse([]string{"--key", "value1", "--key", "value2"})
+	if err != nil {
+		t.Fatal("expected no error; got ", err)
+	}
+}
+
+func TestNoDuplicates(t *testing.T) {
+	f := NewFlagSet("test", ContinueOnError)
+	f.SetDisableDuplicates(true)
+	f.String("key", "", "")
+	err := f.Parse([]string{"--key", "value1", "--key=value2"})
+	if err == nil {
+		t.Fatal("expected an error; got none")
+	}
+	expected := "duplicate flag: --key"
+	if err.Error() != expected {
+		t.Fatalf("expected error %q, got %q", expected, err.Error())
+	}
+}
+
 func TestNoInterspersed(t *testing.T) {
 	f := NewFlagSet("test", ContinueOnError)
 	f.SetInterspersed(false)
